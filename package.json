@@ -1,0 +1,11 @@
+{
+  "name": "codex-agent-bridge",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo": "node src/demo.js",
+    "demo:multi": "node src/demoMulti.js",
+    "probe": "node src/probe.js"
+  }
+}
