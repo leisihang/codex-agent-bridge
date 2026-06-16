@@ -5,7 +5,12 @@
   "type": "module",
   "scripts": {
     "demo": "node src/demo.js",
+    "demo:guarded-flow": "node src/demoGuardedFlow.js",
     "demo:multi": "node src/demoMulti.js",
+    "verify:agent-modes": "node src/flow/verifyAgentModes.js",
+    "verify:agent-runtime": "node src/flow/verifyAgentRuntime.js",
+    "verify:flow-guard": "node src/flow/verifyFlowGuard.js",
+    "verify:manager-flow-guard": "node src/flow/verifyManagerFlowGuard.js",
     "probe": "node src/probe.js"
   }
 }
