@@ -117,6 +117,18 @@ If Electron dependency download is slow in China, install with:
 ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/ corepack pnpm install
 ```
 
+Full ECOS-side setup, startup, troubleshooting, and demo/real-ECC notes are
+documented in:
+
+```text
+https://github.com/leisihang/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.md
+```
+
+Important: this bridge enables the Agent/Codex chat path. Opening ECOS projects
+and running real RTL-to-GDS flow steps still depends on the ECOS `ecc` CLI and
+toolchain environment. For quick Codex GUI smoke tests, a demo-only `ecc` shim
+can be put on `PATH`, but it does not run real EDA tools.
+
 ## ECOS Studio Boundary
 
 ECOS Studio should stay thin:
@@ -174,4 +186,3 @@ Future providers should implement the same runtime-facing methods:
 - Real physical-design execution still depends on the local ECOS/toolchain
   environment.
 - The demo project is for integration validation, not full production EDA flow.
-
