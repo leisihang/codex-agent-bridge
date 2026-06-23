@@ -122,6 +122,7 @@ documented in:
 
 ```text
 https://github.com/leisihang/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.md
+https://github.com/leisihang/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.zh-CN.md
 ```
 
 Important: this bridge enables the Agent/Codex chat path. Opening ECOS projects
