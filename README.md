@@ -87,8 +87,8 @@ npm run demo:guarded-flow
 Clone ECOS Studio and this bridge side by side:
 
 ```bash
-git clone -b checkpoint/codex-gui-working git@github.com:leisihang/ecos-studio.git
-git clone -b checkpoint/codex-agent-bridge-working git@github.com:leisihang/codex-agent-bridge.git
+git clone -b checkpoint/codex-gui-working git@github.com:<your-github-owner>/ecos-studio.git
+git clone -b checkpoint/codex-agent-bridge-working git@github.com:<your-github-owner>/codex-agent-bridge.git
 ```
 
 Install ECOS Studio GUI dependencies:
@@ -121,8 +121,8 @@ Full ECOS-side setup, startup, troubleshooting, and demo/real-ECC notes are
 documented in:
 
 ```text
-https://github.com/leisihang/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.md
-https://github.com/leisihang/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.zh-CN.md
+https://github.com/<your-github-owner>/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.md
+https://github.com/<your-github-owner>/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.zh-CN.md
 ```
 
 Important: this bridge enables the Agent/Codex chat path. Opening ECOS projects

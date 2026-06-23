@@ -3,13 +3,14 @@ import { CodexAgentManager } from "./CodexAgentManager.js";
 import { CodexFlowGuard } from "./flow/CodexFlowGuard.js";
 
 const demoWorkspace = process.env.ECOS_CODEX_DEMO_PROJECT
-  ?? "/mnt/c/Users/26086/Desktop/least_ecos/codex_gui_demo_project_ecos";
+  ?? path.resolve("demo-rtl-project");
+const demoToolsBin = process.env.ECOS_CODEX_DEMO_TOOLS_BIN;
 
 const manager = new CodexAgentManager({
   cwd: demoWorkspace,
   env: {
     ...process.env,
-    PATH: `/mnt/c/Users/26086/Desktop/least_ecos/codex_gui_demo_tools/bin:${process.env.PATH}`,
+    PATH: demoToolsBin ? `${demoToolsBin}:${process.env.PATH}` : process.env.PATH,
   },
   flowGuard: new CodexFlowGuard({
     projectRoot: demoWorkspace,
