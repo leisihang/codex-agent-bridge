@@ -1,0 +1,47 @@
+{
+  "id": "codex_app_server",
+  "displayName": "Codex App Server",
+  "description": "Runs Codex app-server over stdio and exposes it through the ECOS Agent provider protocol.",
+  "version": "0.0.1",
+  "protocol": "agent-provider-stdio.v1",
+  "entry": {
+    "command": "node",
+    "args": [
+      "providers/codex/index.js"
+    ]
+  },
+  "capabilities": {
+    "streaming": true,
+    "interrupt": true,
+    "sessions": true,
+    "resume": true,
+    "approvals": true,
+    "modes": [
+      "general_assistant",
+      "flow_guarded_design"
+    ],
+    "flowGuard": true
+  },
+  "environment": {
+    "requiredCommands": [
+      "codex"
+    ],
+    "optionalCommands": [],
+    "variables": [
+      {
+        "name": "CODEX_HOME",
+        "required": false,
+        "description": "Optional Codex configuration directory."
+      }
+    ]
+  },
+  "workspace": {
+    "requiresWorkspace": true,
+    "defaultSandbox": "workspaceWrite",
+    "networkAccess": false
+  },
+  "metadata": {
+    "providerKind": "codex-app-server",
+    "runtime": "node"
+  }
+}

@@ -206,6 +206,12 @@ Runtime 方法：
 src/providers/codex/CodexAppServerProvider.js
 ```
 
+目标 out-of-process provider 契约：
+
+- [Agent Provider Protocol](docs/provider-protocol.md)
+- [Agent Provider Manifest](docs/provider-manifest.md)
+- [Codex provider manifest 示例](examples/codex-provider.manifest.json)
+
 如果以后要接入其他 agent provider：
 
 1. 实现上面列出的 runtime 方法。

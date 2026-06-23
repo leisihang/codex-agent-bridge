@@ -211,6 +211,12 @@ Current provider:
 src/providers/codex/CodexAppServerProvider.js
 ```
 
+Target out-of-process provider contract:
+
+- [Agent Provider Protocol](docs/provider-protocol.md)
+- [Agent Provider Manifest](docs/provider-manifest.md)
+- [Codex provider manifest example](examples/codex-provider.manifest.json)
+
 To add another agent provider:
 
 1. Implement a provider with the runtime methods listed above.
