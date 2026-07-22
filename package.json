@@ -9,8 +9,10 @@
     "demo:multi": "node src/demoMulti.js",
     "verify:agent-modes": "node src/flow/verifyAgentModes.js",
     "verify:agent-runtime": "node src/flow/verifyAgentRuntime.js",
+    "verify:dse-closed-loop": "node src/dse/verifyDseClosedLoop.js",
     "verify:flow-guard": "node src/flow/verifyFlowGuard.js",
     "verify:manager-flow-guard": "node src/flow/verifyManagerFlowGuard.js",
+    "smoke:openroad-dse": "node src/dse/runOpenRoadDseSmoke.js",
     "probe": "node src/probe.js"
   }
 }

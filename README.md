@@ -1,63 +1,149 @@
-# Codex Agent Bridge
+# Codex Agent Bridge for ECOS Studio
 
-External Agent bridge for ECOS Studio.
+External Agent runtime for the ECOS Studio AI / Agent GUI.
 
 Chinese version: [README.zh-CN.md](README.zh-CN.md).
 
-This repository keeps agent runtime logic outside the ECOS Studio source tree.
-ECOS Studio loads the bridge through `AGENT_BRIDGE_ROOT` and talks to it through
-a small generic Agent API. Codex app-server is the first implemented provider,
-but the bridge is structured so other CLI/RPC agents can be added as providers
-without putting provider-specific logic into ECOS Studio.
+## Simple Overview
 
-## What This Repository Is
+ECOS Studio owns the user-facing GUI: project pages, the AI / Agent panel,
+mode switches, history controls, stop controls, and display of streamed
+messages or command/action blocks.
 
-This bridge is a thin runtime layer between a GUI host and an agent process.
+This repository owns the Agent runtime behind that GUI. ECOS Studio points to
+this checkout with `AGENT_BRIDGE_ROOT`, then calls `src/AgentRuntime.js` through
+a generic Agent API. The bridge starts Codex app-server, manages sessions and
+turns, streams normalized events back to the GUI, and applies guard policies
+before workflow-related actions are accepted.
 
-It provides:
+ECC CLI remains the normal ECOS flow engine. Opening a workspace and running
+ECOS flow steps are still ECOS/ECC responsibilities, not Codex replacements.
+The Agent bridge can talk about a workspace, read files when allowed, and run
+approved commands, but real RTL-to-GDS execution depends on a working ECC CLI,
+PDK, and toolchain environment.
 
-- provider registry and runtime entrypoint
-- Codex app-server process management
-- session/thread start and resume
-- turn start, streaming events, and interrupt
-- Codex event normalization into a generic Agent event shape
-- optional FlowGuard mode for ECOS-style workflow constraints
-
-It does not provide:
-
-- the ECOS Studio GUI itself
-- real ECC/EDA tool installation
-- a replacement for ECOS `ecc` CLI flow execution
-- production-grade multi-agent plugin packaging
-
-## Architecture
+The three paths are intentionally separate:
 
 ```text
-ECOS Studio renderer
-  -> Electron preload / IPC
-  -> AgentRuntimeService in ECOS Studio
-  -> AGENT_BRIDGE_ROOT/src/AgentRuntime.js
-  -> provider registry
-  -> Codex app-server provider
-  -> codex app-server --listen stdio://
+Agent chat:
+ECOS Studio GUI -> agent IPC/preload -> codex-agent-bridge -> Codex app-server
+
+ECOS workspace and flow:
+ECOS Studio GUI -> desktop runtime -> ecc workspace commands -> EDA tools/PDK
+
+DSE research prototype:
+codex-agent-bridge -> DSE controller/FSM -> tool adapter -> OpenROAD Docker now
 ```
 
-ECOS Studio should stay thin:
+The DSE prototype has a clean adapter boundary so the current OpenROAD Docker
+backend can later be replaced by an ECC CLI adapter.
 
-- Agent chat UI
-- generic `agent:*` IPC handlers
-- preload API
-- shared TypeScript contracts
-- startup script that points to this external bridge
+## Current Implementation
 
-This bridge should own:
+### ECOS Studio AI / Agent GUI integration
 
-- agent process management
-- provider adapters
-- event normalization
-- session mapping
-- approval and interrupt handling
-- FlowGuard / workflow policy logic
+The paired ECOS Studio branch provides the GUI side of the integration:
+
+- AI / Agent chat panel in ECOS Studio.
+- Generic `agent:*` IPC handlers.
+- Preload API exposed as `window.ecosDesktop.agent`.
+- Shared Agent contracts used by the renderer and desktop process.
+- `pnpm run dev:agent` startup path.
+- Bridge discovery through `AGENT_BRIDGE_ROOT`, `CODEX_AGENT_BRIDGE_ROOT`,
+  external checkout paths, or sibling checkout paths.
+- General assistant mode and flow-guarded design mode.
+
+This repository is the external runtime used by that GUI.
+
+### Agent bridge runtime
+
+The bridge currently provides:
+
+- Codex app-server provider.
+- Codex process startup over `codex app-server --listen stdio://`.
+- Session/thread start and resume.
+- Turn start, streaming event normalization, interrupt, and status handling.
+- Command/action event forwarding for GUI display.
+- `CodexFlowGuard` for ECOS-style guarded workflow mode.
+- Verification scripts for runtime, modes, and FlowGuard behavior.
+
+### ECC CLI boundary
+
+ECOS Studio uses ECC CLI for workspace operations such as:
+
+```bash
+ecc workspace load --directory <workspace> --json
+ecc workspace get-home --directory <workspace> --json
+ecc workspace run-step --directory <workspace> --step <step> --json
+ecc workspace run-flow --directory <workspace> --json
+```
+
+Facts about the current state:
+
+- ECC CLI is separate from Codex and from this bridge.
+- ECOS Studio can use ECC CLI to open and run workspaces when the ECC
+  environment, PDK, and toolchain are available.
+- The bridge does not replace ECC CLI.
+- The current DSE smoke path does not yet call ECC CLI. It calls OpenROAD
+  Docker directly through `OpenRoadDockerAdapter`.
+- The intended next step is an `EccCliDseAdapter` that lets the same DSE
+  controller call ECC CLI as the unified tool entry.
+
+### DSE / FSM research prototype
+
+The bridge also includes a minimal DSE closed loop:
+
+- `DseController` launches candidates, runs early/final stages, records state,
+  and creates branch candidates.
+- `DseFlowGuard` validates candidate state transitions, agent actions, branch
+  depth, maximum candidate count, and parameter schemas.
+- `DseTriggerPolicy` checks cheap metrics such as WNS, TNS, and congestion
+  before asking a subagent.
+- `RuleBasedDseSubAgent` and `CodexDseSubAgent` implement the subagent
+  decision interface.
+- `OpenRoadDockerAdapter` is the currently verified tool backend.
+
+This is a research extension of the Agent bridge. It is not required for basic
+ECOS Agent chat, and it is not yet the production ECOS/ECC flow engine.
+
+## Verified Status
+
+Bridge-only checks:
+
+```bash
+npm run verify:agent-runtime
+npm run verify:agent-modes
+npm run verify:flow-guard
+npm run verify:manager-flow-guard
+npm run verify:dse-closed-loop
+```
+
+Real OpenROAD DSE smoke:
+
+```bash
+npm run smoke:openroad-dse
+```
+
+The real smoke run verified this loop on `nangate45/gcd`:
+
+1. Create seed candidate `gcd_seed`.
+2. Run OpenROAD-flow-scripts `make place` in Docker.
+3. Collect WNS/TNS from `3_detailed_place.rpt`.
+4. Trigger subagent review when `WNS = -0.02` matched the configured threshold.
+5. Accept a `branch_rerun` decision after `DseFlowGuard` validation.
+6. Change `CORE_UTILIZATION` from `55` to `50`.
+7. Create `gcd_seed_branch_1`.
+8. Re-run `place`.
+9. Continue to `make finish`.
+10. Generate GDS and record metrics, logs, history, and agent decisions.
+
+In ORFS, `make place` includes global placement and detailed placement. The
+trigger metric used by this prototype is the detailed-placement report.
+
+GUI verification note: Electron GUI display requires a working graphical
+environment such as `DISPLAY`, X11, Wayland, or VNC. The bridge can be verified
+headlessly, but the final ECOS Agent panel must be checked in a graphical
+session.
 
 ## Repository Layout
 
@@ -75,7 +161,13 @@ src/CodexAgentManager.js
   Codex thread, turn, approval, interrupt, and FlowGuard integration.
 
 src/flow/
-  FlowGuard state machine and verification scripts.
+  ECOS-style FlowGuard state machine and verification scripts.
+
+src/dse/
+  DSE controller, DSE FSM/FlowGuard, trigger policies, subagents, and adapters.
+
+docs/
+  Provider protocol docs and DSE closed-loop docs.
 
 demo-rtl-project/
   Minimal standalone RTL workspace for bridge demos.
@@ -86,9 +178,23 @@ generated/
 
 ## Requirements
 
+For basic Agent bridge checks:
+
 - Node.js
 - npm
 - Codex CLI installed and logged in
+
+For ECOS Studio GUI integration:
+
+- ECOS Studio GUI dependencies
+- a graphical desktop environment
+- this bridge checkout available through `AGENT_BRIDGE_ROOT`
+
+For normal ECOS workspace loading and real flow execution:
+
+- initialized ECOS submodules
+- working ECC CLI
+- required PDK and EDA toolchain resources
 
 Check Codex locally:
 
@@ -101,41 +207,7 @@ codex app-server --listen stdio://
 If the last command starts successfully, stop it with `Ctrl+C`. The bridge will
 start app-server itself when used by ECOS Studio.
 
-## Quick Verification
-
-From this repository:
-
-```bash
-npm run probe
-npm run demo
-npm run demo:multi
-```
-
-Runtime and FlowGuard checks:
-
-```bash
-npm run verify:agent-runtime
-npm run verify:agent-modes
-npm run verify:flow-guard
-npm run verify:manager-flow-guard
-```
-
-Optional guarded-flow demo:
-
-```bash
-npm run demo:guarded-flow
-```
-
-`demo:guarded-flow` uses `demo-rtl-project` by default. To point it at another
-workspace or demo tool directory:
-
-```bash
-ECOS_CODEX_DEMO_PROJECT=/path/to/project \
-ECOS_CODEX_DEMO_TOOLS_BIN=/path/to/demo-tools/bin \
-npm run demo:guarded-flow
-```
-
-## Use With ECOS Studio
+## Quick Start With ECOS Studio
 
 Clone ECOS Studio and this bridge side by side:
 
@@ -164,44 +236,93 @@ cd ecos-studio/ecos/gui
 AGENT_BRIDGE_ROOT=../../../codex-agent-bridge corepack pnpm run dev:agent
 ```
 
-Full ECOS-side setup, startup, troubleshooting, and demo/real-ECC notes are
-documented in:
+More ECOS-side setup details are documented in the ECOS Studio repository:
 
 ```text
-https://github.com/<your-github-owner>/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.md
-https://github.com/<your-github-owner>/ecos-studio/blob/checkpoint/codex-gui-working/ecos/docs/agent-codex-gui.zh-CN.md
+ecos/docs/agent-codex-gui.md
+ecos/docs/agent-codex-gui.zh-CN.md
 ```
 
-Important: this bridge enables the Agent/Codex chat path. Opening ECOS projects
-and running real RTL-to-GDS flow steps still depends on ECOS Studio's `ecc` CLI
-and toolchain environment.
+## Verification Commands
 
-## Runtime API
+From this repository:
 
-The public entrypoint is:
+```bash
+npm run probe
+npm run demo
+npm run demo:multi
+```
+
+Runtime and FlowGuard checks:
+
+```bash
+npm run verify:agent-runtime
+npm run verify:agent-modes
+npm run verify:flow-guard
+npm run verify:manager-flow-guard
+```
+
+DSE closed-loop verification without real EDA tools:
+
+```bash
+npm run verify:dse-closed-loop
+```
+
+Real OpenROAD Docker smoke:
+
+```bash
+npm run smoke:openroad-dse
+```
+
+Useful OpenROAD smoke overrides:
+
+```bash
+OPENROAD_DSE_ORFS_ROOT=/path/to/OpenROAD-flow-scripts
+OPENROAD_DSE_RUN_ROOT=/path/to/run-root
+OPENROAD_DSE_IMAGE=openroad/flow-ubuntu22.04-builder:ea032d
+OPENROAD_DSE_EARLY_TARGET=place
+OPENROAD_DSE_FINAL_TARGET=finish
+```
+
+Branch-rerun demo knobs:
+
+```bash
+OPENROAD_DSE_MAX_BRANCH_DEPTH=1 \
+OPENROAD_DSE_MAX_CANDIDATES=2 \
+OPENROAD_DSE_TRIGGER_WNS_BELOW=0 \
+OPENROAD_DSE_BRANCH_WNS_THRESHOLD=0 \
+OPENROAD_DSE_PRUNE_WNS_THRESHOLD=-1 \
+npm run smoke:openroad-dse
+```
+
+## DSE Adapter Migration To ECC CLI
+
+The DSE controller talks to tool backends through a small adapter interface:
+
+```js
+await adapter.prepareExperiment(context);
+await adapter.runStage({ candidate, context, stage: "early" });
+await adapter.collectMetrics({ candidate, context, runResult, stage: "early" });
+await adapter.runStage({ candidate, context, stage: "final" });
+await adapter.collectMetrics({ candidate, context, runResult, stage: "final" });
+```
+
+`OpenRoadDockerAdapter` implements this interface today. An `EccCliDseAdapter`
+can implement the same interface by calling ECC CLI commands. That would make
+the chain:
 
 ```text
-src/AgentRuntime.js
+ECOS Agent GUI / bridge
+  -> codex-agent-bridge DSE controller
+  -> ECC CLI adapter
+  -> ecc workspace run-step / run-flow
+  -> EDA backend selected by ECC
 ```
 
-The default provider is:
+More details:
 
-```text
-codex_app_server
-```
-
-Runtime methods:
-
-- `start`
-- `startSession`
-- `sendMessage`
-- `interrupt`
-- `getStatus`
-- `setMode`
-- `listSessions`
-- `resumeSession`
-- `stop`
-- `onEvent`
+- [DSE closed loop](docs/dse-closed-loop.md)
+- [DSE closed loop, Chinese](docs/dse-closed-loop.zh-CN.md)
 
 ## Provider Model
 
@@ -219,7 +340,7 @@ Target out-of-process provider contract:
 
 To add another agent provider:
 
-1. Implement a provider with the runtime methods listed above.
+1. Implement a provider with the runtime methods used by `AgentRuntime.js`.
 2. Register it in `src/core/AgentProviderRegistry.js`.
 3. Keep provider-specific process/RPC/protocol code in this repository.
 4. Expose only normalized Agent events to ECOS Studio.
@@ -229,25 +350,6 @@ Provider id example:
 ```js
 registerAgentProvider("my_rpc_agent", (options) => new MyRpcAgentProvider(options));
 ```
-
-## FlowGuard
-
-FlowGuard is an optional prototype guard layer for ECOS-style workflows. It is
-intended to constrain side-effecting agent actions by checking workflow context,
-step status, and allowed paths/commands.
-
-Current scope:
-
-- lightweight DAG/step checks
-- mode switch between general assistant and flow-guarded design
-- decision events for GUI display and audit
-
-Out of scope for now:
-
-- full artifact versioning
-- automatic rollback
-- production-quality EDA quality gates
-- replacing the ECOS `ecc` flow engine
 
 ## Troubleshooting
 
@@ -262,20 +364,12 @@ codex app-server --listen stdio://
 If ECOS Studio cannot find the bridge:
 
 ```bash
-echo $AGENT_BRIDGE_ROOT
+echo "$AGENT_BRIDGE_ROOT"
 ls "$AGENT_BRIDGE_ROOT/src/AgentRuntime.js"
 ```
 
-If ECOS Studio can chat but cannot open or run projects, check the ECOS `ecc`
-CLI environment. That is a GUI/ECC setup issue, not a bridge issue.
+If the bridge can chat but ECOS cannot open or run a workspace, check the ECOS
+`ecc` CLI and toolchain environment. That is separate from the bridge protocol.
 
-If a demo command fails because real EDA tools are missing, use the bridge
-verification scripts first. Real physical-design execution requires the ECOS
-toolchain.
-
-## Current Limitations
-
-- Codex app-server is currently the only implemented provider.
-- FlowGuard is a prototype policy layer.
-- Real physical-design execution depends on ECOS/ECC/toolchain setup.
-- Provider packaging is not productionized yet.
+If DSE OpenROAD smoke fails, check Docker, the OpenROAD-flow-scripts path, and
+the selected Docker image.

@@ -629,6 +629,12 @@ export class CodexFlowGuard {
       );
     }
 
+    if (step.status === "running" && this.activeStep === stepId) {
+      return normalizeDecision("accept", `Step ${stepId} is already active for the current command.`, {
+        step: stepId,
+      });
+    }
+
     if (!RERUNNABLE_STEP_STATUSES.has(step.status)) {
       return normalizeDecision("decline", `Step ${stepId} is ${step.status}, so it is not runnable.`, {
         step: stepId,
